@@ -4,9 +4,12 @@ from weather import Forecast
 from datetime import datetime
 from telebot import types
 from sqlite_reminder import DataBase
+from id_handler import Hanler_id
 
 bot = telebot.TeleBot(config.TOKEN)
 forecast = Forecast()
+user_id = Hanler_id()
+import time_delay
 
 
 #from telegram import Update
@@ -43,10 +46,18 @@ def start(message):
     msg = bot.send_message(message.chat.id, "Hello, " + message.chat.first_name +" )\n" +
                      "Let me know where are U 🤔\n" +
                      "Please enter the name of your city")
+
+    global m
+    m = message.chat.id
+    # time_delay.delay_start()
+
     bot.register_next_step_handler(msg, define_city)
+
+
 
 def define_city(message):
         forecast.set_city(message.text)
+        user_id.set_id(message.chat.id)
         try:
             weather = str(forecast.get_data()["weather"][0]["main"])
         except KeyError:
@@ -189,7 +200,16 @@ def check_reminders(message):
     #Should add buttons to delete reminders
     markap_inline = types.InlineKeyboardMarkup()
     for reminder in db.get_reminder(message.chat.id):
-        markap_inline.add(types.InlineKeyboardButton(text=reminder[1], callback_data=reminder[1]))
+        if reminder[1][0]=="t":
+            text = "Temperature"+reminder[1][1:]
+        elif reminder[1][0] == "h":
+            text = "Humidity"+reminder[1][1:]
+        elif reminder[1][0] == "w":
+            text = "Wind"+reminder[1][1:]
+        else:
+            text = str(reminder[1][0]).upper()+reminder[1][1:]
+        text += " ("+reminder[2]+")"
+        markap_inline.add(types.InlineKeyboardButton(text=text, callback_data=reminder[1]))
 
     bot.send_message(message.chat.id, "This is your current reminders:\n" +
                      "(U can press to delete)\n", reply_markup=markap_inline)
@@ -255,28 +275,81 @@ def create_reminder(message, par, msg, sign):
         db = DataBase()
         creatingFlag = True
         for reminder in db.get_reminder(message.chat.id):
-            if reminder[1] == par+message.text:
+            if reminder[1] == par+message.text and reminder[2] == forecast.city:
                 creatingFlag = False
         if creatingFlag:
-            db.set_reminder(message.chat.id, par+message.text, datetime.utcnow())
+            db.set_reminder(message.chat.id, par+message.text, forecast.city)
             bot.send_message(message.chat.id, "Will remind when: " + msg + message.text +
                              sign + "\n" + "(U can /check_reminders)")
         else:
-            bot.send_message(message.chat.id, "U already have that one )")
+            bot.send_message(message.chat.id, "U already have that one )\n"
+                                              "But U can re /start to change city")
         db.close()
 
 def create_simple_rem(message, par):
     db = DataBase()
     creatinFlag = True
     for reminder in db.get_reminder(message.chat.id):
-        if reminder[1] == par:
+        if reminder[1] == par and reminder[2] == forecast.city:
             creatinFlag = False
     if creatinFlag:
-        db.set_reminder(message.chat.id, par, datetime.utcnow())
+        db.set_reminder(message.chat.id, par, forecast.city)
         db.close()
         bot.send_message(message.chat.id, "Reminder created! \n"
-                                          "(U can /check-reminders)")
+                                          "(U can /check_reminders)")
     else:
-        bot.send_message(message.chat.id, "U already have that one )")
+        bot.send_message(message.chat.id, "U already have that one )\n"
+                                          "But U can re /start to change city")
+
+#Don't sure about that function
+def make_notification():
+    if forecast.city != "x":
+        #print("id = " + str(user_id.id))
+        #print("city = " + forecast.city)
+        #bot.send_message(user_id.id, "1m remind + " + forecast.city)
+        db = DataBase()
+        for reminder in db.get_reminder(user_id.id):
+            #bot.send_message(user_id.id, reminder[1])
+            forecast.set_city(reminder[2])
+            if reminder[1][0] == 't':
+                if reminder[1][1] == "<":
+                    if forecast.get_data()['main']['temp_min'] < float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Temperature " +
+                                         str(forecast.get_data()['main']['temp_min']) +
+                                         "°C < " + reminder[1][2:] + "°C in the " + forecast.city)
+                elif reminder[1][1] == ">":
+                    if forecast.get_data()['main']['temp_max'] > float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Temperature " +
+                                         str(forecast.get_data()['main']['temp_min']) +
+                                         "°C > " + reminder[1][2:] + "°C in the " + forecast.city)
+            elif reminder[1][0] == "h":
+                if reminder[1][1] == "<":
+                    if forecast.get_data()['main']['humidity'] < float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Humidity " +
+                                         str(forecast.get_data()['main']['humidity']) +
+                                         "% < " + reminder[1][2:] + "% in the " + forecast.city)
+                    elif forecast.get_data()['main']['humidity'] > float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Humidity " +
+                                         str(forecast.get_data()['main']['humidity']) +
+                                         "% > " + reminder[1][2:] + "% in the " + forecast.city)
+            elif reminder[1][0] == "w":
+                if reminder[1][1] == "<":
+                    if forecast.get_data()["wind"]["speed"] < float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Wind speed " +
+                                         str(forecast.get_data()["wind"]["speed"]) +
+                                         "m/s < " + reminder[1][2:] + "m/s in the " + forecast.city)
+                    elif forecast.get_data()["wind"]["speed"] > float(reminder[1][2:]):
+                        bot.send_message(user_id.id, "Wind speed " +
+                                         str(forecast.get_data()["wind"]["speed"]) +
+                                         "m/s > " + reminder[1][2:] + "m/s in the " + forecast.city)
+            elif reminder[1] == "snow":
+                bot.send_message(user_id.id, "Oh it is Snowing ) in the " + forecast.city)
+            elif reminder[1] == "rain":
+                bot.send_message(user_id.id, "Oh it is Raining ) in the " + forecast.city)
+            elif reminder[1] == "clouds":
+                bot.send_message(user_id.id, "Oh it is Clouds ) in the " + forecast.city)
+
+
+        db.close()
 
 bot.polling(none_stop=True)
