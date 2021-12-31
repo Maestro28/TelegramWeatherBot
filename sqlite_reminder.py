@@ -18,17 +18,17 @@ class DataBase:
 
     def set_reminder(self, id, parameter, city):
         with self.con:
-            self.c.execute("INSERT INTO reminder VALUES(:id, :parameter, :city)",
+            self.c.execute("INSERT INTO reminder VALUES(:id, :parameter, :city  )",
                       {'id': id, 'parameter': parameter, 'city': city})
 
     def get_reminder(self, id):
         self.c.execute("SELECT * FROM reminder WHERE id=:id", {'id': id})
         return self.c.fetchall()
 
-    def remove_rem(self, parameter):
+    def remove_reminder(self, id, parameter, city):
         with self.con:
-            self.c.execute("DELETE from reminder WHERE parameter= :par",
-                      {'par': parameter})
+            self.c.execute("DELETE from reminder WHERE parameter= :par AND city = :c AND id = :id",
+                      {'par': parameter, 'c': city, 'id': id})
 
 
     def close(self):
@@ -42,6 +42,8 @@ class DataBase:
 # d.set_reminder("5", "five", "five oklok")
 # d.set_reminder(6, "sfive", "six oklok")
 # print(d.get_reminder(6))
+
+#d.remove_reminder("380919107", "clouds", "Kiev")
 
 #d.close()
 

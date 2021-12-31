@@ -9,23 +9,7 @@ from id_handler import Hanler_id
 bot = telebot.TeleBot(config.TOKEN)
 forecast = Forecast()
 user_id = Hanler_id()
-import time_delay
 
-
-#from telegram import Update
-#from telegram.ext import CallbackContext
-
-"""
-def star(update: Update, context: CallbackContext):
-    context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
-"""
-
-#bot.set_chat_description()
-
-"""
-import telegram_send
-telegram_send.send(messages=["Wow that was easy!"])
-"""
 
 @bot.message_handler(commands="help")
 def help(message):
@@ -103,8 +87,9 @@ def answer(call):
     elif call.data != "i for i in [1,2,3]:":
         db = DataBase()
         for reminder in db.get_reminder(call.message.chat.id):
-            if call.data == reminder[1]:
-                db.remove_rem(reminder[1])
+            if call.data == reminder[1]+" "+reminder[2]:
+                #db.remove_rem(reminder[1])
+                db.remove_reminder(call.message.chat.id, reminder[1], reminder[2])
         db.close()
         bot.send_message(call.message.chat.id, "Reminder removed. Try /check_reminders again")
     else:
@@ -209,7 +194,7 @@ def check_reminders(message):
         else:
             text = str(reminder[1][0]).upper()+reminder[1][1:]
         text += " ("+reminder[2]+")"
-        markap_inline.add(types.InlineKeyboardButton(text=text, callback_data=reminder[1]))
+        markap_inline.add(types.InlineKeyboardButton(text=text, callback_data=reminder[1]+" "+reminder[2]))
 
     bot.send_message(message.chat.id, "This is your current reminders:\n" +
                      "(U can press to delete)\n", reply_markup=markap_inline)
@@ -317,38 +302,50 @@ def make_notification():
                         bot.send_message(user_id.id, "Temperature " +
                                          str(forecast.get_data()['main']['temp_min']) +
                                          "°C < " + reminder[1][2:] + "°C in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
                 elif reminder[1][1] == ">":
                     if forecast.get_data()['main']['temp_max'] > float(reminder[1][2:]):
                         bot.send_message(user_id.id, "Temperature " +
-                                         str(forecast.get_data()['main']['temp_min']) +
+                                         str(forecast.get_data()['main']['temp_max']) +
                                          "°C > " + reminder[1][2:] + "°C in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
             elif reminder[1][0] == "h":
                 if reminder[1][1] == "<":
                     if forecast.get_data()['main']['humidity'] < float(reminder[1][2:]):
                         bot.send_message(user_id.id, "Humidity " +
                                          str(forecast.get_data()['main']['humidity']) +
                                          "% < " + reminder[1][2:] + "% in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
                     elif forecast.get_data()['main']['humidity'] > float(reminder[1][2:]):
                         bot.send_message(user_id.id, "Humidity " +
                                          str(forecast.get_data()['main']['humidity']) +
                                          "% > " + reminder[1][2:] + "% in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
             elif reminder[1][0] == "w":
                 if reminder[1][1] == "<":
                     if forecast.get_data()["wind"]["speed"] < float(reminder[1][2:]):
                         bot.send_message(user_id.id, "Wind speed " +
                                          str(forecast.get_data()["wind"]["speed"]) +
                                          "m/s < " + reminder[1][2:] + "m/s in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
                     elif forecast.get_data()["wind"]["speed"] > float(reminder[1][2:]):
                         bot.send_message(user_id.id, "Wind speed " +
                                          str(forecast.get_data()["wind"]["speed"]) +
                                          "m/s > " + reminder[1][2:] + "m/s in the " + forecast.city)
+                        db.remove_reminder(reminder[0], reminder[1], forecast.city)
             elif reminder[1] == "snow":
-                bot.send_message(user_id.id, "Oh it is Snowing ) in the " + forecast.city)
+                if forecast.get_data()["weather"][0]["main"] == "Snow":
+                    bot.send_message(user_id.id, "Oh it is Snowing ) in the " + forecast.city)
+                    db.remove_reminder(reminder[0], reminder[1], forecast.city)
             elif reminder[1] == "rain":
-                bot.send_message(user_id.id, "Oh it is Raining ) in the " + forecast.city)
+                if forecast.get_data()["weather"][0]["main"] == "Rain":
+                    bot.send_message(user_id.id, "Oh it is Raining ) in the " + forecast.city)
+                    db.remove_reminder(reminder[0], reminder[1], forecast.city)
             elif reminder[1] == "clouds":
-                bot.send_message(user_id.id, "Oh it is Clouds ) in the " + forecast.city)
-
+                if forecast.get_data()["weather"][0]["main"] == "Clouds":
+                    bot.send_message(user_id.id, "Oh it is Clouds ) in the " + forecast.city)
+                    # should remove reminder after every message sent
+                    db.remove_reminder(reminder[0], reminder[1], forecast.city)
 
         db.close()
 
